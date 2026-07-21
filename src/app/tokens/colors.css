@@ -1,0 +1,103 @@
+/* ============================================================
+   Color tokens
+   Base palette + semantic aliases.
+   Brand magenta = #C31C54
+   ============================================================ */
+:root {
+  /* ---- Brand magenta (primary) ---- */
+  --magenta-50:  #fce7ee;
+  --magenta-100: #f9c9d9;
+  --magenta-200: #f095b0;
+  --magenta-300: #e5658c;
+  --magenta-400: #d63e6f;
+  --magenta-500: #c31c54; /* PRIMARY */
+  --magenta-600: #a8164a;
+  --magenta-700: #8e1240;
+  --magenta-800: #6e0e32;
+  --magenta-900: #4c0a23;
+
+  /* ---- Secondary brand accents (from journey gradients & imagery) ---- */
+  --violet-400: #b3a4f2;
+  --violet-500: #9680ea;
+  --violet-600: #6b4fd8;
+  --coral-500:  #e1405b;
+  --deep-500:   #9c1e62;
+
+  /* tech-imagery accents (data-viz, decorative only) */
+  --blue-500:   #2d7ff9;
+  --orange-500: #e8870c;
+
+  /* ---- Neutrals (cool near-black ramp) ---- */
+  --white:    #ffffff;
+  --ink-50:   #f9f9f9;
+  --ink-100:  #e7e9ef;
+  --ink-200:  #cdd0da;
+  --ink-300:  #a3a8b7;
+  --ink-400:  #7b8092;
+  --ink-500:  #565b6e;
+  --ink-600:  #353948;
+  --ink-700:  #232633;
+  --ink-800:  #161821;
+  --ink-900:  #0d0e14; /* site header / deep surface */
+  --ink-950:  #0a0a0a; /* page black */
+  --warm-dark:#271d24; /* warm magenta-tinted dark section */
+
+  /* ---- Semantic status ---- */
+  --success-500: #1f9d6b;
+  --success-50:  #e6f6ef;
+  --warning-500: #e8870c;
+  --warning-50:  #fdf2e3;
+  --error-500:   #d6313b;
+  --error-50:    #fdeaeb;
+  --info-500:    #2d7ff9;
+  --info-50:     #e9f2fe;
+
+  /* ============================================================
+     SEMANTIC ALIASES — prefer these in components
+     ============================================================ */
+  --brand-primary:        var(--magenta-500);
+  --brand-primary-hover:  var(--magenta-600);
+  --brand-primary-active: var(--magenta-700);
+  --brand-primary-soft:   var(--magenta-50);
+  --brand-on-primary:     var(--white);
+  --focus-ring:           rgba(195, 28, 84, 0.45);
+
+  /* surfaces (light) */
+  --bg-page:           var(--white);
+  --surface-card:      var(--white);
+  --surface-muted:     var(--ink-50);
+  --surface-sunken:    var(--ink-100);
+
+  /* surfaces (dark — the brand's signature mode) */
+  --bg-page-dark:        var(--ink-950);
+  --surface-dark:        var(--ink-900);
+  --surface-dark-raised: var(--ink-800);
+  --surface-dark-warm:   var(--warm-dark);
+
+  /* text */
+  --text-strong:        var(--ink-950);
+  --text-body:          var(--ink-600);
+  --text-muted:         var(--ink-500);
+  --text-faint:         var(--ink-400);
+  --text-on-dark:        var(--white);
+  --text-on-dark-muted:  rgba(255, 255, 255, 0.72);
+  --text-on-dark-faint:  rgba(255, 255, 255, 0.5);
+  --text-on-primary:     var(--white);
+  --text-link:           var(--magenta-500);
+
+  /* borders */
+  --border-subtle:   var(--ink-100);
+  --border-default:  var(--ink-200);
+  --border-strong:   var(--ink-300);
+  --border-on-dark:  rgba(255, 255, 255, 0.12);
+  --border-on-dark-strong: rgba(255, 255, 255, 0.24);
+
+  /* ---- Signature gradients (the "journey" cards & heroes) ---- */
+  --gradient-api:    linear-gradient(150deg, #6b4fd8 0%, #9680ea 100%);
+  --gradient-data:   linear-gradient(150deg, #c31c54 0%, #e1405b 100%);
+  --gradient-genai:  linear-gradient(150deg, #6e0e32 0%, #9c1e62 100%);
+  --gradient-magenta:linear-gradient(135deg, #c31c54 0%, #9c1e62 100%);
+  --gradient-spectrum: linear-gradient(120deg, #6b4fd8 0%, #c31c54 50%, #e8870c 100%);
+  --gradient-hero-veil: linear-gradient(90deg, rgba(10,10,10,0.94) 0%, rgba(10,10,10,0.6) 45%, rgba(10,10,10,0.15) 100%);
+  --gradient-dark-warm: radial-gradient(120% 140% at 15% -10%, #2a1722 0%, #0a0a0a 60%);
+}
