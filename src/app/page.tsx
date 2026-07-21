@@ -10,9 +10,10 @@ import { Table, Th, Td, Mono } from "@/components/ds/Table";
 export const dynamic = "force-dynamic";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const RECENT_PAGE_SIZE = 20;
 
 function formatTime(ts: number) {
-  return new Date(ts).toLocaleString("pt-BR", {
+  return new Date(ts).toLocaleString("en-US", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -20,7 +21,7 @@ function formatTime(ts: number) {
   });
 }
 
-function loadDashboardData() {
+function loadDashboardData(recentPage: number) {
   const now = Date.now();
   const startOfToday = new Date().setHours(0, 0, 0, 0);
   const last30d = now - 30 * DAY_MS;
@@ -57,18 +58,33 @@ function loadDashboardData() {
     .orderBy(desc(sql`count(*)`))
     .all();
 
+  const recentTotal = db
+    .select({ total: sql<number>`count(*)` })
+    .from(usageLogs)
+    .all()[0]?.total ?? 0;
+  const recentPageCount = Math.max(1, Math.ceil(recentTotal / RECENT_PAGE_SIZE));
+  const page = Math.min(Math.max(1, recentPage), recentPageCount);
+
   const recent = db
     .select()
     .from(usageLogs)
     .orderBy(desc(usageLogs.createdAt))
-    .limit(20)
+    .limit(RECENT_PAGE_SIZE)
+    .offset((page - 1) * RECENT_PAGE_SIZE)
     .all();
 
-  return { totals, today, allMcps, publishedCount, perMcp, recent };
+  return { totals, today, allMcps, publishedCount, perMcp, recent, recentPage: page, recentPageCount };
 }
 
-export default function HomePage() {
-  const { totals, today, allMcps, publishedCount, perMcp, recent } = loadDashboardData();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page: pageParam } = await searchParams;
+  const requestedPage = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+  const { totals, today, allMcps, publishedCount, perMcp, recent, recentPage, recentPageCount } =
+    loadDashboardData(requestedPage);
 
   const mcpName = (mcpId: number) =>
     allMcps.find((m) => m.id === mcpId)?.name ?? `MCP #${mcpId}`;
@@ -81,8 +97,8 @@ export default function HomePage() {
     <div>
       <PageHeader
         eyebrow="Home"
-        title="Consumo dos seus MCPs"
-        description="Acompanhe as chamadas que os agentes fazem aos MCP servers publicados."
+        title="Usage across your MCPs"
+        description="Track the calls agents make to your published MCP servers."
       />
 
       <Card style={{ marginBottom: "var(--space-6)" }}>
@@ -93,12 +109,12 @@ export default function HomePage() {
             gap: "var(--space-8)",
           }}
         >
-          <StatCard value={totalCalls} label="Chamadas nos últimos 30 dias" />
-          <StatCard value={today?.total ?? 0} label="Chamadas hoje" accent={false} />
-          <StatCard value={publishedCount} label="MCPs publicados" accent={false} />
+          <StatCard value={totalCalls} label="Calls in the last 30 days" />
+          <StatCard value={today?.total ?? 0} label="Calls today" accent={false} />
+          <StatCard value={publishedCount} label="Published MCPs" accent={false} />
           <StatCard
             value={`${errorRate}%`}
-            label="Taxa de erro (30 dias)"
+            label="Error rate (30 days)"
             accent={errorRate > 0}
           />
         </div>
@@ -114,21 +130,21 @@ export default function HomePage() {
       >
         <Card padding={0}>
           <div style={{ padding: "var(--space-5) var(--space-6) var(--space-3)" }}>
-            <h3 style={{ font: "var(--type-h3)" }}>Chamadas por MCP</h3>
+            <h3 style={{ font: "var(--type-h3)" }}>Calls per MCP</h3>
           </div>
           {perMcp.length === 0 ? (
             <p style={{ padding: "0 var(--space-6) var(--space-6)", color: "var(--text-muted)", font: "var(--type-body-sm)" }}>
-              Sem chamadas ainda. <Link href="/mcps">Publique um MCP</Link> e conecte um agente.
+              No calls yet. <Link href="/mcps">Publish an MCP</Link> and connect an agent.
             </p>
           ) : (
             <Table>
               <thead>
                 <tr>
                   <Th>MCP</Th>
-                  <Th>Chamadas</Th>
-                  <Th>Erros</Th>
-                  <Th>Média</Th>
-                  <Th>Última</Th>
+                  <Th>Calls</Th>
+                  <Th>Errors</Th>
+                  <Th>Avg</Th>
+                  <Th>Last</Th>
                 </tr>
               </thead>
               <tbody>
@@ -160,11 +176,11 @@ export default function HomePage() {
 
         <Card padding={0}>
           <div style={{ padding: "var(--space-5) var(--space-6) var(--space-3)" }}>
-            <h3 style={{ font: "var(--type-h3)" }}>Atividade recente</h3>
+            <h3 style={{ font: "var(--type-h3)" }}>Recent activity</h3>
           </div>
           {recent.length === 0 ? (
             <p style={{ padding: "0 var(--space-6) var(--space-6)", color: "var(--text-muted)", font: "var(--type-body-sm)" }}>
-              As chamadas de tools aparecem aqui em tempo real.
+              Tool calls will show up here in real time.
             </p>
           ) : (
             <Table>
@@ -173,8 +189,8 @@ export default function HomePage() {
                   <Th>Tool</Th>
                   <Th>MCP</Th>
                   <Th>Status</Th>
-                  <Th>Duração</Th>
-                  <Th>Quando</Th>
+                  <Th>Duration</Th>
+                  <Th>When</Th>
                 </tr>
               </thead>
               <tbody>
@@ -188,7 +204,7 @@ export default function HomePage() {
                       {log.status === "ok" ? (
                         <Badge tone="success">{log.httpStatus ?? "ok"}</Badge>
                       ) : (
-                        <Badge tone="error">{log.httpStatus ?? "erro"}</Badge>
+                        <Badge tone="error">{log.httpStatus ?? "error"}</Badge>
                       )}
                     </Td>
                     <Td>
@@ -199,6 +215,43 @@ export default function HomePage() {
                 ))}
               </tbody>
             </Table>
+          )}
+          {recentPageCount > 1 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "var(--space-4) var(--space-6)",
+                borderTop: "1px solid var(--border-subtle)",
+                font: "var(--type-body-sm)",
+                color: "var(--text-muted)",
+              }}
+            >
+              <Link
+                href={recentPage > 1 ? `/?page=${recentPage - 1}` : "#"}
+                aria-disabled={recentPage <= 1}
+                style={{
+                  color: recentPage > 1 ? "var(--brand-primary)" : "var(--text-faint)",
+                  pointerEvents: recentPage > 1 ? "auto" : "none",
+                }}
+              >
+                ← Previous
+              </Link>
+              <span>
+                Page {recentPage} of {recentPageCount}
+              </span>
+              <Link
+                href={recentPage < recentPageCount ? `/?page=${recentPage + 1}` : "#"}
+                aria-disabled={recentPage >= recentPageCount}
+                style={{
+                  color: recentPage < recentPageCount ? "var(--brand-primary)" : "var(--text-faint)",
+                  pointerEvents: recentPage < recentPageCount ? "auto" : "none",
+                }}
+              >
+                Next →
+              </Link>
+            </div>
           )}
         </Card>
       </div>

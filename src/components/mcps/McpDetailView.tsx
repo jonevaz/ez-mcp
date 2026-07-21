@@ -27,7 +27,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       type="button"
-      aria-label="Copiar"
+      aria-label="Copy"
       onClick={() => {
         navigator.clipboard.writeText(text);
         setCopied(true);
@@ -104,7 +104,7 @@ function ToolEditor({ tool }: { tool: McpTool }) {
         <Mono style={{ color: "var(--brand-primary)", fontWeight: 600 }}>{tool.toolName}</Mono>
         <button
           type="button"
-          aria-label="Editar tool"
+          aria-label="Edit tool"
           onClick={() => setEditing(true)}
           style={{
             border: "none",
@@ -132,19 +132,19 @@ function ToolEditor({ tool }: { tool: McpTool }) {
       }}
       style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}
     >
-      <Input name="toolName" defaultValue={tool.toolName} aria-label="Nome da tool" />
+      <Input name="toolName" defaultValue={tool.toolName} aria-label="Tool name" />
       <Input
         name="toolDescription"
         defaultValue={tool.toolDescription || ""}
-        aria-label="Descrição da tool"
-        placeholder="Descrição da tool"
+        aria-label="Tool description"
+        placeholder="Tool description"
       />
       <div style={{ display: "flex", gap: 8 }}>
         <Button size="sm" type="submit" disabled={pending}>
-          {pending ? "Salvando…" : "Salvar"}
+          {pending ? "Saving…" : "Save"}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
-          Cancelar
+          Cancel
         </Button>
       </div>
     </form>
@@ -199,7 +199,7 @@ export function McpDetailView({
           marginBottom: "var(--space-4)",
         }}
       >
-        <ArrowLeft size={15} /> Voltar para MCPs
+        <ArrowLeft size={15} /> Back to MCPs
       </Link>
 
       <div
@@ -215,9 +215,9 @@ export function McpDetailView({
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <h1 style={{ font: "var(--type-h2)" }}>{mcp.name}</h1>
             {mcp.published ? (
-              <Badge tone="success">Publicado</Badge>
+              <Badge tone="success">Published</Badge>
             ) : (
-              <Badge tone="neutral">Rascunho</Badge>
+              <Badge tone="neutral">Draft</Badge>
             )}
           </div>
           <Mono style={{ color: "var(--text-muted)", fontSize: 13 }}>/api/mcp/{mcp.slug}</Mono>
@@ -229,7 +229,7 @@ export function McpDetailView({
         </div>
         <div style={{ display: "flex", gap: 8, flex: "none" }}>
           <Button variant="outline" size="sm" iconLeft={<Pencil size={14} />} onClick={() => setEditing(true)}>
-            Editar
+            Edit
           </Button>
           {mcp.published ? (
             <Button
@@ -243,7 +243,7 @@ export function McpDetailView({
                 })
               }
             >
-              Despublicar
+              Unpublish
             </Button>
           ) : (
             <Button
@@ -253,11 +253,11 @@ export function McpDetailView({
               onClick={() =>
                 startTransition(async () => {
                   const result = await publishMcp(mcp.id);
-                  setError(result.ok ? null : result.error || "Falha ao publicar.");
+                  setError(result.ok ? null : result.error || "Failed to publish.");
                 })
               }
             >
-              Publicar
+              Publish
             </Button>
           )}
         </div>
@@ -281,7 +281,7 @@ export function McpDetailView({
             }}
           >
             <h3 style={{ font: "var(--type-h3)", color: "var(--white)" }}>
-              MCP publicado — pronto para conectar
+              MCP published — ready to connect
             </h3>
             <Button
               variant="on-dark"
@@ -289,35 +289,35 @@ export function McpDetailView({
               iconLeft={<RefreshCw size={14} />}
               disabled={isPending}
               onClick={() => {
-                if (confirm("Gerar um novo token? O token atual deixa de funcionar.")) {
+                if (confirm("Generate a new token? The current token will stop working.")) {
                   startTransition(async () => {
                     await regenerateToken(mcp.id);
                   });
                 }
               }}
             >
-              Novo token
+              New token
             </Button>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Snippet label="URL do MCP (Streamable HTTP)" code={mcpUrl} />
-            <Snippet label="Token Bearer" code={mcp.token} />
+            <Snippet label="MCP URL (Streamable HTTP)" code={mcpUrl} />
+            <Snippet label="Bearer token" code={mcp.token} />
             <Snippet label="Claude Code" code={claudeSnippet} />
-            <Snippet label="Cursor / outros clientes (mcp.json)" code={jsonSnippet} />
+            <Snippet label="Cursor / other clients (mcp.json)" code={jsonSnippet} />
           </div>
         </Card>
       )}
 
       <h2 style={{ font: "var(--type-h3)", marginBottom: 6 }}>Tools</h2>
       <p style={{ font: "var(--type-body-sm)", color: "var(--text-muted)", marginBottom: "var(--space-5)" }}>
-        Selecione os endpoints das suas fontes que este MCP expõe como tools.
+        Select the endpoints from your sources that this MCP exposes as tools.
       </p>
 
       {sources.length === 0 && (
         <Card tone="muted" style={{ textAlign: "center", padding: "var(--space-10)" }}>
           <p style={{ color: "var(--text-muted)" }}>
-            Nenhuma fonte com endpoints ativos.{" "}
-            <Link href="/fontes">Cadastre uma fonte</Link> primeiro.
+            No sources with active endpoints.{" "}
+            <Link href="/sources">Register a source</Link> first.
           </p>
         </Card>
       )}

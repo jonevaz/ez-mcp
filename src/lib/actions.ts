@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { db, sources, endpoints, mcps, mcpTools } from "@/db";
 import { parseOpenApiSpec, toToolName } from "@/lib/openapi";
@@ -41,17 +41,24 @@ function authConfigFrom(formData: FormData): string | null {
         username: String(formData.get("authUsername") || ""),
         password: String(formData.get("authPassword") || ""),
       });
+    case "oauth2":
+      return JSON.stringify({
+        tokenUrl: String(formData.get("authTokenUrl") || ""),
+        clientId: String(formData.get("authClientId") || ""),
+        clientSecret: String(formData.get("authClientSecret") || ""),
+        scope: String(formData.get("authScope") || "") || undefined,
+      });
     default:
       return null;
   }
 }
 
-// ---------------- Fontes ----------------
+// ---------------- Sources ----------------
 
 export async function createSource(formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") || "").trim();
   const baseUrl = String(formData.get("baseUrl") || "").trim();
-  if (!name || !baseUrl) return { ok: false, error: "Nome e URL base são obrigatórios." };
+  if (!name || !baseUrl) return { ok: false, error: "Name and base URL are required." };
 
   const [row] = db
     .insert(sources)
@@ -66,14 +73,14 @@ export async function createSource(formData: FormData): Promise<ActionResult> {
     .returning({ id: sources.id })
     .all();
 
-  revalidatePath("/fontes");
+  revalidatePath("/sources");
   return { ok: true, id: row.id };
 }
 
 export async function updateSource(id: number, formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") || "").trim();
   const baseUrl = String(formData.get("baseUrl") || "").trim();
-  if (!name || !baseUrl) return { ok: false, error: "Nome e URL base são obrigatórios." };
+  if (!name || !baseUrl) return { ok: false, error: "Name and base URL are required." };
 
   db.update(sources)
     .set({
@@ -86,13 +93,32 @@ export async function updateSource(id: number, formData: FormData): Promise<Acti
     .where(eq(sources.id, id))
     .run();
 
-  revalidatePath("/fontes");
+  revalidatePath("/sources");
   return { ok: true };
 }
 
 export async function deleteSource(id: number): Promise<ActionResult> {
+  // MCPs que usam tools desta fonte: se algum estiver publicado, volta a rascunho
+  // (as tools são removidas junto via cascade ao apagar os endpoints).
+  const affectedMcpIds = db
+    .selectDistinct({ mcpId: mcpTools.mcpId })
+    .from(mcpTools)
+    .innerJoin(endpoints, eq(mcpTools.endpointId, endpoints.id))
+    .where(eq(endpoints.sourceId, id))
+    .all()
+    .map((r) => r.mcpId);
+
   db.delete(sources).where(eq(sources.id, id)).run();
-  revalidatePath("/fontes");
+
+  if (affectedMcpIds.length > 0) {
+    db.update(mcps)
+      .set({ published: false })
+      .where(and(inArray(mcps.id, affectedMcpIds), eq(mcps.published, true)))
+      .run();
+    for (const mcpId of affectedMcpIds) revalidatePath(`/mcps/${mcpId}`);
+  }
+
+  revalidatePath("/sources");
   revalidatePath("/mcps");
   return { ok: true };
 }
@@ -106,23 +132,23 @@ export async function importOpenApi(formData: FormData): Promise<ActionResult> {
     if (!raw && specUrl) {
       const res = await fetch(specUrl, { signal: AbortSignal.timeout(20_000) });
       if (!res.ok) {
-        return { ok: false, error: `Não conseguimos baixar a spec (HTTP ${res.status}).` };
+        return { ok: false, error: `Could not download the spec (HTTP ${res.status}).` };
       }
       raw = await res.text();
     }
-    if (!raw) return { ok: false, error: "Informe a URL da spec ou cole o conteúdo." };
+    if (!raw) return { ok: false, error: "Provide the spec URL or paste the content." };
 
     const parsed = parseOpenApiSpec(raw);
     const name = String(formData.get("name") || "").trim() || parsed.title;
     let baseUrl = String(formData.get("baseUrl") || "").trim() || parsed.baseUrl;
-    // servers[] relativo (ex.: "/api/v3") → resolve contra a URL da spec
+    // Relative servers[] (e.g. "/api/v3") → resolve against the spec URL
     if (baseUrl && !/^https?:\/\//i.test(baseUrl) && specUrl) {
       baseUrl = new URL(baseUrl, specUrl).toString().replace(/\/$/, "");
     }
     if (!baseUrl) {
       return {
         ok: false,
-        error: "A spec não define `servers`. Informe a URL base manualmente.",
+        error: "The spec doesn't define `servers`. Provide the base URL manually.",
       };
     }
 
@@ -154,10 +180,10 @@ export async function importOpenApi(formData: FormData): Promise<ActionResult> {
         .run();
     }
 
-    revalidatePath("/fontes");
+    revalidatePath("/sources");
     return { ok: true, id: row.id };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Falha ao importar a spec." };
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to import the spec." };
   }
 }
 
@@ -166,7 +192,7 @@ export async function importOpenApi(formData: FormData): Promise<ActionResult> {
 export async function createEndpoint(sourceId: number, formData: FormData): Promise<ActionResult> {
   const method = String(formData.get("method") || "GET").toUpperCase();
   const path = String(formData.get("path") || "").trim();
-  if (!path.startsWith("/")) return { ok: false, error: "O path deve começar com `/`." };
+  if (!path.startsWith("/")) return { ok: false, error: "The path must start with `/`." };
 
   db.insert(endpoints)
     .values({
@@ -180,20 +206,20 @@ export async function createEndpoint(sourceId: number, formData: FormData): Prom
     })
     .run();
 
-  revalidatePath("/fontes");
+  revalidatePath("/sources");
   return { ok: true };
 }
 
 export async function deleteEndpoint(id: number): Promise<ActionResult> {
   db.delete(endpoints).where(eq(endpoints.id, id)).run();
-  revalidatePath("/fontes");
+  revalidatePath("/sources");
   revalidatePath("/mcps");
   return { ok: true };
 }
 
 export async function toggleEndpoint(id: number, enabled: boolean): Promise<ActionResult> {
   db.update(endpoints).set({ enabled }).where(eq(endpoints.id, id)).run();
-  revalidatePath("/fontes");
+  revalidatePath("/sources");
   return { ok: true };
 }
 
@@ -201,7 +227,7 @@ export async function toggleEndpoint(id: number, enabled: boolean): Promise<Acti
 
 export async function createMcp(formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") || "").trim();
-  if (!name) return { ok: false, error: "O nome é obrigatório." };
+  if (!name) return { ok: false, error: "Name is required." };
 
   let slug = slugify(String(formData.get("slug") || "").trim() || name);
   const existing = db.select().from(mcps).where(eq(mcps.slug, slug)).all();
@@ -225,7 +251,7 @@ export async function createMcp(formData: FormData): Promise<ActionResult> {
 
 export async function updateMcp(id: number, formData: FormData): Promise<ActionResult> {
   const name = String(formData.get("name") || "").trim();
-  if (!name) return { ok: false, error: "O nome é obrigatório." };
+  if (!name) return { ok: false, error: "Name is required." };
 
   const slug = slugify(String(formData.get("slug") || "").trim() || name);
   const clash = db
@@ -234,7 +260,7 @@ export async function updateMcp(id: number, formData: FormData): Promise<ActionR
     .where(eq(mcps.slug, slug))
     .all()
     .filter((m) => m.id !== id);
-  if (clash.length > 0) return { ok: false, error: "Já existe um MCP com esse slug." };
+  if (clash.length > 0) return { ok: false, error: "An MCP with that slug already exists." };
 
   db.update(mcps)
     .set({
@@ -263,7 +289,7 @@ export async function publishMcp(id: number): Promise<ActionResult> {
     .where(and(eq(mcpTools.mcpId, id), eq(mcpTools.enabled, true)))
     .all().length;
   if (toolCount === 0) {
-    return { ok: false, error: "Adicione ao menos uma tool antes de publicar." };
+    return { ok: false, error: "Add at least one tool before publishing." };
   }
 
   const existing = db.select().from(mcps).where(eq(mcps.id, id)).all()[0];
@@ -290,7 +316,7 @@ export async function regenerateToken(id: number): Promise<ActionResult> {
   return { ok: true };
 }
 
-// ---------------- Tools do MCP ----------------
+// ---------------- MCP Tools ----------------
 
 export async function toggleMcpTool(
   mcpId: number,
@@ -305,7 +331,7 @@ export async function toggleMcpTool(
 
   if (selected && !existing) {
     const ep = db.select().from(endpoints).where(eq(endpoints.id, endpointId)).all()[0];
-    if (!ep) return { ok: false, error: "Endpoint não encontrado." };
+    if (!ep) return { ok: false, error: "Endpoint not found." };
 
     let toolName = toToolName(ep.name, ep.method, ep.path);
     const siblings = db
@@ -339,10 +365,10 @@ export async function updateMcpTool(toolId: number, formData: FormData): Promise
     .trim()
     .replace(/[^A-Za-z0-9_-]/g, "_")
     .slice(0, 64);
-  if (!toolName) return { ok: false, error: "O nome da tool é obrigatório." };
+  if (!toolName) return { ok: false, error: "Tool name is required." };
 
   const tool = db.select().from(mcpTools).where(eq(mcpTools.id, toolId)).all()[0];
-  if (!tool) return { ok: false, error: "Tool não encontrada." };
+  if (!tool) return { ok: false, error: "Tool not found." };
 
   db.update(mcpTools)
     .set({

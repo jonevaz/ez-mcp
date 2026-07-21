@@ -89,12 +89,12 @@ export async function POST(
   const { slug } = await params;
   const mcp = loadMcpBySlug(slug);
   if (!mcp) {
-    return jsonResponse({ error: "MCP não encontrado ou não publicado." }, 404);
+    return jsonResponse({ error: "MCP not found or not published." }, 404);
   }
 
   const authHeader = req.headers.get("authorization") || "";
   if (!mcp.token || authHeader !== `Bearer ${mcp.token}`) {
-    return jsonResponse({ error: "Token Bearer inválido ou ausente." }, 401);
+    return jsonResponse({ error: "Invalid or missing Bearer token." }, 401);
   }
 
   let message: JsonRpcMessage;
@@ -105,7 +105,7 @@ export async function POST(
   }
 
   if (Array.isArray(message)) {
-    return rpcError(null, -32600, "Batches não são suportados.", 400);
+    return rpcError(null, -32600, "Batches are not supported.", 400);
   }
 
   const { id, method, params: rpcParams } = message;
@@ -153,7 +153,7 @@ export async function POST(
       const args = (rpcParams?.arguments ?? {}) as Record<string, unknown>;
       const row = loadTools(mcp.id).find((r) => r.tool.toolName === toolName);
       if (!row) {
-        return rpcError(id ?? null, -32602, `Tool desconhecida: ${toolName}`);
+        return rpcError(id ?? null, -32602, `Unknown tool: ${toolName}`);
       }
 
       const started = Date.now();
@@ -190,16 +190,16 @@ export async function POST(
             createdAt: Date.now(),
           })
           .run();
-        const msg = err instanceof Error ? err.message : "Falha ao chamar a API de origem.";
+        const msg = err instanceof Error ? err.message : "Failed to call the source API.";
         return rpcResult(id, {
-          content: [{ type: "text", text: `Erro: ${msg}` }],
+          content: [{ type: "text", text: `Error: ${msg}` }],
           isError: true,
         });
       }
     }
 
     default:
-      return rpcError(id ?? null, -32601, `Método não suportado: ${method}`);
+      return rpcError(id ?? null, -32601, `Unsupported method: ${method}`);
   }
 }
 

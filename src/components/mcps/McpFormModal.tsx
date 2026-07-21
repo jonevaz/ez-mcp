@@ -34,43 +34,43 @@ export function McpFormModal({
       onClose();
       if (!mcp && result.id) router.push(`/mcps/${result.id}`);
     } else {
-      setError(result.error || "Algo deu errado.");
+      setError(result.error || "Something went wrong.");
     }
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={isEdit ? "Editar MCP" : "Novo MCP"}>
+    <Modal open={open} onClose={onClose} title={isEdit ? "Edit MCP" : "New MCP"}>
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Input
-          label="Nome"
+          label="Name"
           name="name"
           required
           defaultValue={mcp?.name || ""}
-          placeholder="Ex.: MCP de clientes"
+          placeholder="E.g.: Customers MCP"
         />
         <Input
-          label="Slug (opcional)"
+          label="Slug (optional)"
           name="slug"
           defaultValue={mcp?.slug || ""}
-          placeholder="gerado a partir do nome"
-          hint="Define a URL pública: /api/mcp/<slug>"
+          placeholder="generated from the name"
+          hint="Defines the public URL: /api/mcp/<slug>"
         />
         <Textarea
-          label="Descrição (opcional)"
+          label="Description (optional)"
           name="description"
           rows={3}
           defaultValue={mcp?.description || ""}
-          placeholder="O que este MCP oferece aos agentes"
+          placeholder="What this MCP offers to agents"
         />
         {error && (
           <p style={{ font: "var(--type-body-sm)", color: "var(--error-500)" }}>{error}</p>
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Button variant="outline" onClick={onClose}>
-            Cancelar
+            Cancel
           </Button>
           <Button type="submit" disabled={pending}>
-            {pending ? "Salvando…" : isEdit ? "Salvar" : "Criar MCP"}
+            {pending ? "Saving…" : isEdit ? "Save" : "Create MCP"}
           </Button>
         </div>
       </form>

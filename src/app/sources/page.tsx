@@ -1,9 +1,9 @@
 import { db, sources, endpoints } from "@/db";
-import { FontesView } from "@/components/fontes/FontesView";
+import { SourcesView } from "@/components/sources/SourcesView";
 
 export const dynamic = "force-dynamic";
 
-export default function FontesPage() {
+export default function SourcesPage() {
   const allSources = db.select().from(sources).all();
   const allEndpoints = db.select().from(endpoints).all();
 
@@ -12,5 +12,5 @@ export default function FontesPage() {
     endpoints: allEndpoints.filter((e) => e.sourceId === s.id),
   }));
 
-  return <FontesView sources={data} />;
+  return <SourcesView sources={data} />;
 }

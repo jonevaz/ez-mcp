@@ -6,7 +6,7 @@ import { LayoutDashboard, Database, Server } from "lucide-react";
 
 const NAV = [
   { href: "/", label: "Home", icon: LayoutDashboard },
-  { href: "/fontes", label: "Fontes", icon: Database },
+  { href: "/sources", label: "Sources", icon: Database },
   { href: "/mcps", label: "MCPs", icon: Server },
 ];
 
@@ -91,7 +91,7 @@ export function AppSidebar() {
           color: "var(--text-on-dark-faint)",
         }}
       >
-        Transformamos suas APIs em MCP servers.
+        We turn your APIs into MCP servers.
       </div>
     </aside>
   );

@@ -45,19 +45,19 @@ export function EndpointFormModal({
     const result = await createEndpoint(source.id, formData);
     setPending(false);
     if (result.ok) onClose();
-    else setError(result.error || "Algo deu errado.");
+    else setError(result.error || "Something went wrong.");
   }
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`Novo endpoint — ${source?.name ?? ""}`}
+      title={`New endpoint — ${source?.name ?? ""}`}
       width={680}
     >
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 12 }}>
-          <Select label="Método" name="method" defaultValue="GET">
+          <Select label="Method" name="method" defaultValue="GET">
             <option>GET</option>
             <option>POST</option>
             <option>PUT</option>
@@ -69,14 +69,14 @@ export function EndpointFormModal({
             name="path"
             required
             placeholder="/users/{id}"
-            hint="Parâmetros de path entre chaves: /users/{id}"
+            hint="Path parameters in braces: /users/{id}"
           />
         </div>
-        <Input label="Nome (opcional)" name="name" placeholder="Ex.: Buscar usuário por id" />
+        <Input label="Name (optional)" name="name" placeholder="E.g.: Get user by id" />
         <Input
-          label="Descrição (opcional)"
+          label="Description (optional)"
           name="description"
-          placeholder="O que este endpoint faz — vira a descrição da tool"
+          placeholder="What this endpoint does — becomes the tool description"
         />
 
         <div>
@@ -89,7 +89,7 @@ export function EndpointFormModal({
             }}
           >
             <span style={{ font: "var(--type-label)", color: "var(--text-strong)" }}>
-              Parâmetros
+              Parameters
             </span>
             <Button
               variant="ghost"
@@ -97,13 +97,13 @@ export function EndpointFormModal({
               iconLeft={<Plus size={14} />}
               onClick={() => setParams((prev) => [...prev, { ...EMPTY_PARAM }])}
             >
-              Adicionar
+              Add
             </Button>
           </div>
 
           {params.length === 0 && (
             <p style={{ font: "var(--type-body-sm)", color: "var(--text-muted)" }}>
-              Nenhum parâmetro. Adicione parâmetros de path, query, header ou body.
+              No parameters. Add path, query, header, or body parameters.
             </p>
           )}
 
@@ -119,13 +119,13 @@ export function EndpointFormModal({
                 }}
               >
                 <Input
-                  aria-label="Nome do parâmetro"
-                  placeholder="nome"
+                  aria-label="Parameter name"
+                  placeholder="name"
                   value={p.name}
                   onChange={(e) => setParam(i, { name: e.target.value })}
                 />
                 <Select
-                  aria-label="Local"
+                  aria-label="Location"
                   value={p.in}
                   onChange={(e) => setParam(i, { in: e.target.value as EndpointParam["in"] })}
                 >
@@ -135,7 +135,7 @@ export function EndpointFormModal({
                   <option value="body">body</option>
                 </Select>
                 <Select
-                  aria-label="Tipo"
+                  aria-label="Type"
                   value={p.type}
                   onChange={(e) => setParam(i, { type: e.target.value as EndpointParam["type"] })}
                 >
@@ -149,11 +149,11 @@ export function EndpointFormModal({
                 <Checkbox
                   checked={p.required}
                   onChange={(v) => setParam(i, { required: v })}
-                  label={<span style={{ fontSize: 13 }}>obrig.</span>}
+                  label={<span style={{ fontSize: 13 }}>req.</span>}
                 />
                 <button
                   type="button"
-                  aria-label="Remover parâmetro"
+                  aria-label="Remove parameter"
                   onClick={() => setParams((prev) => prev.filter((_, j) => j !== i))}
                   style={{
                     border: "none",
@@ -177,10 +177,10 @@ export function EndpointFormModal({
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Button variant="outline" onClick={onClose}>
-            Cancelar
+            Cancel
           </Button>
           <Button type="submit" disabled={pending}>
-            {pending ? "Salvando…" : "Criar endpoint"}
+            {pending ? "Saving…" : "Create endpoint"}
           </Button>
         </div>
       </form>

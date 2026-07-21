@@ -18,7 +18,6 @@ export function Modal({ open, title, onClose, children, width = 560 }: ModalProp
   if (!open) return null;
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,
@@ -32,7 +31,6 @@ export function Modal({ open, title, onClose, children, width = 560 }: ModalProp
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: width,
@@ -55,7 +53,7 @@ export function Modal({ open, title, onClose, children, width = 560 }: ModalProp
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fechar"
+            aria-label="Close"
             style={{
               border: "none",
               background: "none",

@@ -6,8 +6,8 @@ export const sources = sqliteTable("sources", {
   name: text("name").notNull(),
   description: text("description"),
   baseUrl: text("base_url").notNull(),
-  authType: text("auth_type").notNull().default("none"), // none | bearer | api_key | basic
-  authConfig: text("auth_config"), // JSON: { token } | { header, value } | { username, password }
+  authType: text("auth_type").notNull().default("none"), // none | bearer | api_key | basic | oauth2
+  authConfig: text("auth_config"), // JSON: { token } | { header, value } | { username, password } | { tokenUrl, clientId, clientSecret, scope }
   specRaw: text("spec_raw"), // spec OpenAPI original (quando importada)
   createdAt: integer("created_at").notNull(),
 });

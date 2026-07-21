@@ -18,7 +18,7 @@ Visual baseado em design system próprio (tokens em
   `/api/mcp/<slug>` (Streamable HTTP, stateless), protegido por token Bearer
   próprio, com snippets prontos para Claude Code e Cursor.
 
-Sem autenticação na plataforma nesta versão.
+Sem autenticação na ferramenta nesta versão.
 
 ## Rodando
 

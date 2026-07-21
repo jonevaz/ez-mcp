@@ -22,11 +22,11 @@ export function McpsView({ mcps }: { mcps: McpRow[] }) {
     <div>
       <PageHeader
         eyebrow="MCPs"
-        title="Seus MCP servers"
-        description="Agrupe endpoints das suas fontes em MCP servers e publique para consumir no Claude Code, Cursor e outros agentes."
+        title="Your MCP servers"
+        description="Group endpoints from your sources into MCP servers and publish them for use in Claude Code, Cursor, and other agents."
         action={
           <Button iconLeft={<Plus size={16} />} onClick={() => setCreating(true)}>
-            Novo MCP
+            New MCP
           </Button>
         }
       />
@@ -34,12 +34,12 @@ export function McpsView({ mcps }: { mcps: McpRow[] }) {
       {mcps.length === 0 ? (
         <Card tone="muted" style={{ textAlign: "center", padding: "var(--space-16)" }}>
           <Server size={32} strokeWidth={1.5} style={{ margin: "0 auto 12px", color: "var(--text-faint)" }} />
-          <h3 style={{ font: "var(--type-h3)", marginBottom: 8 }}>Nenhum MCP criado</h3>
+          <h3 style={{ font: "var(--type-h3)", marginBottom: 8 }}>No MCPs yet</h3>
           <p style={{ color: "var(--text-muted)", marginBottom: 20 }}>
-            Crie seu primeiro MCP server e selecione as tools a partir das suas fontes.
+            Create your first MCP server and select tools from your sources.
           </p>
           <Button iconLeft={<Plus size={16} />} onClick={() => setCreating(true)}>
-            Novo MCP
+            New MCP
           </Button>
         </Card>
       ) : (
@@ -47,7 +47,7 @@ export function McpsView({ mcps }: { mcps: McpRow[] }) {
           <Table>
             <thead>
               <tr>
-                <Th>Nome</Th>
+                <Th>Name</Th>
                 <Th>Slug</Th>
                 <Th style={{ width: 90 }}>Tools</Th>
                 <Th style={{ width: 120 }}>Status</Th>
@@ -80,18 +80,18 @@ export function McpsView({ mcps }: { mcps: McpRow[] }) {
                   <Td>{mcp.toolCount}</Td>
                   <Td>
                     {mcp.published ? (
-                      <Badge tone="success">Publicado</Badge>
+                      <Badge tone="success">Published</Badge>
                     ) : (
-                      <Badge tone="neutral">Rascunho</Badge>
+                      <Badge tone="neutral">Draft</Badge>
                     )}
                   </Td>
                   <Td>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
                       <button
                         type="button"
-                        aria-label="Excluir MCP"
+                        aria-label="Delete MCP"
                         onClick={() => {
-                          if (confirm(`Excluir o MCP "${mcp.name}"?`)) {
+                          if (confirm(`Delete MCP "${mcp.name}"?`)) {
                             startTransition(async () => {
                               await deleteMcp(mcp.id);
                             });
@@ -110,7 +110,7 @@ export function McpsView({ mcps }: { mcps: McpRow[] }) {
                       </button>
                       <Link
                         href={`/mcps/${mcp.id}`}
-                        aria-label="Abrir MCP"
+                        aria-label="Open MCP"
                         style={{ display: "flex", color: "var(--text-faint)" }}
                       >
                         <ChevronRight size={17} />

@@ -45,3 +45,5 @@ data/
 
 # Claude Code local settings (contém tokens/permissões locais)
 .claude/settings.local.json
+AGENTS.md
+CLAUDE.md

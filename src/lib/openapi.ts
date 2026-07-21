@@ -27,7 +27,7 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
     spec = YAML.parse(raw);
   }
   if (!spec || typeof spec !== "object" || !spec.paths) {
-    throw new Error("Spec inválida: não encontramos o objeto `paths` da OpenAPI.");
+    throw new Error("Invalid spec: could not find the OpenAPI `paths` object.");
   }
 
   const info = (spec.info ?? {}) as { title?: string; description?: string };
@@ -68,7 +68,7 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
           in: "body",
           type: "object",
           required: rb.required ?? false,
-          description: rb.description || "Corpo JSON da requisição.",
+          description: rb.description || "JSON request body.",
         });
       }
 
@@ -84,11 +84,11 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
   }
 
   if (endpoints.length === 0) {
-    throw new Error("A spec não contém operações reconhecíveis em `paths`.");
+    throw new Error("The spec doesn't contain recognizable operations in `paths`.");
   }
 
   return {
-    title: info.title || "API importada",
+    title: info.title || "Imported API",
     description: (info.description || "").trim(),
     baseUrl,
     endpoints,

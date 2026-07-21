@@ -24,40 +24,67 @@ function AuthFields({
   return (
     <>
       <Select
-        label="Autenticação da API"
+        label="API authentication"
         name="authType"
         value={authType}
         onChange={(e) => setAuthType(e.target.value)}
       >
-        <option value="none">Sem autenticação</option>
+        <option value="none">No authentication</option>
         <option value="bearer">Bearer token</option>
         <option value="api_key">API Key (header)</option>
-        <option value="basic">Basic (usuário e senha)</option>
+        <option value="basic">Basic (username and password)</option>
+        <option value="oauth2">OAuth 2.0 (client credentials)</option>
       </Select>
       {authType === "bearer" && (
         <Input
           label="Token"
           name="authToken"
           defaultValue={config.token || ""}
-          placeholder="token de acesso à API de origem"
+          placeholder="access token for the source API"
         />
       )}
       {authType === "api_key" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Input label="Header" name="authHeader" defaultValue={config.header || "X-API-Key"} />
-          <Input label="Valor" name="authValue" defaultValue={config.value || ""} />
+          <Input label="Value" name="authValue" defaultValue={config.value || ""} />
         </div>
       )}
       {authType === "basic" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Input label="Usuário" name="authUsername" defaultValue={config.username || ""} />
+          <Input label="Username" name="authUsername" defaultValue={config.username || ""} />
           <Input
-            label="Senha"
+            label="Password"
             name="authPassword"
             type="password"
             defaultValue={config.password || ""}
           />
         </div>
+      )}
+      {authType === "oauth2" && (
+        <>
+          <Input
+            label="Token URL"
+            name="authTokenUrl"
+            defaultValue={config.tokenUrl || ""}
+            placeholder="https://auth.example.com/oauth/token"
+            hint="Client Credentials flow — the token is fetched server-side and cached until it expires."
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Input label="Client ID" name="authClientId" defaultValue={config.clientId || ""} />
+            <Input
+              label="Client Secret"
+              name="authClientSecret"
+              type="password"
+              defaultValue={config.clientSecret || ""}
+            />
+          </div>
+          <Input
+            label="Scope (optional)"
+            name="authScope"
+            defaultValue={config.scope || ""}
+            placeholder="read write"
+          />
+        </>
       )}
     </>
   );
@@ -90,21 +117,21 @@ export function SourceFormModal({
       : await createSource(formData);
     setPending(false);
     if (result.ok) onClose();
-    else setError(result.error || "Algo deu errado.");
+    else setError(result.error || "Something went wrong.");
   }
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Editar fonte" : "Nova fonte"}
+      title={isEdit ? "Edit source" : "New source"}
       width={620}
     >
       {!isEdit && (
         <Tabs
           items={[
-            { value: "import", label: "Importar OpenAPI" },
-            { value: "manual", label: "Cadastro manual" },
+            { value: "import", label: "Import OpenAPI" },
+            { value: "manual", label: "Manual setup" },
           ]}
           value={tab}
           onChange={setTab}
@@ -116,23 +143,23 @@ export function SourceFormModal({
         {!isEdit && tab === "import" && (
           <>
             <Input
-              label="URL da spec OpenAPI"
+              label="OpenAPI spec URL"
               name="specUrl"
-              placeholder="https://api.exemplo.com/openapi.json"
-              hint="JSON ou YAML. Alternativamente, cole o conteúdo abaixo."
+              placeholder="https://api.example.com/openapi.json"
+              hint="JSON or YAML. Alternatively, paste the content below."
             />
             <Textarea
-              label="Ou cole a spec"
+              label="Or paste the spec"
               name="specText"
               rows={5}
               placeholder='{"openapi": "3.0.0", ...}'
             />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Nome (opcional)" name="name" placeholder="usa o título da spec" />
+              <Input label="Name (optional)" name="name" placeholder="uses the spec title" />
               <Input
-                label="URL base (opcional)"
+                label="Base URL (optional)"
                 name="baseUrl"
-                placeholder="usa o servers[] da spec"
+                placeholder="uses the spec's servers[]"
               />
             </div>
           </>
@@ -141,21 +168,21 @@ export function SourceFormModal({
         {(isEdit || tab === "manual") && (
           <>
             <Input
-              label="Nome"
+              label="Name"
               name="name"
               required
               defaultValue={source?.name || ""}
-              placeholder="Ex.: API de clientes"
+              placeholder="E.g.: Customers API"
             />
             <Input
-              label="URL base"
+              label="Base URL"
               name="baseUrl"
               required
               defaultValue={source?.baseUrl || ""}
-              placeholder="https://api.exemplo.com/v1"
+              placeholder="https://api.example.com/v1"
             />
             <Textarea
-              label="Descrição (opcional)"
+              label="Description (optional)"
               name="description"
               rows={2}
               defaultValue={source?.description || ""}
@@ -171,10 +198,10 @@ export function SourceFormModal({
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
           <Button variant="outline" onClick={onClose}>
-            Cancelar
+            Cancel
           </Button>
           <Button type="submit" disabled={pending}>
-            {pending ? "Salvando…" : isEdit ? "Salvar" : tab === "import" ? "Importar" : "Criar fonte"}
+            {pending ? "Saving…" : isEdit ? "Save" : tab === "import" ? "Import" : "Create source"}
           </Button>
         </div>
       </form>

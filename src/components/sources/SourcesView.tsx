@@ -21,13 +21,14 @@ import { EndpointFormModal } from "./EndpointFormModal";
 export type SourceWithEndpoints = Source & { endpoints: Endpoint[] };
 
 const AUTH_LABELS: Record<string, string> = {
-  none: "Sem auth",
+  none: "No auth",
   bearer: "Bearer",
   api_key: "API Key",
   basic: "Basic",
+  oauth2: "OAuth 2.0",
 };
 
-export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
+export function SourcesView({ sources }: { sources: SourceWithEndpoints[] }) {
   const [creating, setCreating] = React.useState(false);
   const [editing, setEditing] = React.useState<SourceWithEndpoints | null>(null);
   const [addingEndpointTo, setAddingEndpointTo] = React.useState<SourceWithEndpoints | null>(null);
@@ -36,12 +37,12 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
   return (
     <div>
       <PageHeader
-        eyebrow="Fontes"
-        title="Suas APIs de origem"
-        description="Cadastre as APIs que serão transformadas em tools MCP. Importe uma spec OpenAPI ou defina os endpoints manualmente."
+        eyebrow="Sources"
+        title="Your source APIs"
+        description="Register the APIs that will be turned into MCP tools. Import an OpenAPI spec or define the endpoints manually."
         action={
           <Button iconLeft={<Plus size={16} />} onClick={() => setCreating(true)}>
-            Nova fonte
+            New source
           </Button>
         }
       />
@@ -49,12 +50,12 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
       {sources.length === 0 && (
         <Card tone="muted" style={{ textAlign: "center", padding: "var(--space-16)" }}>
           <Database size={32} strokeWidth={1.5} style={{ margin: "0 auto 12px", color: "var(--text-faint)" }} />
-          <h3 style={{ font: "var(--type-h3)", marginBottom: 8 }}>Nenhuma fonte cadastrada</h3>
+          <h3 style={{ font: "var(--type-h3)", marginBottom: 8 }}>No sources yet</h3>
           <p style={{ color: "var(--text-muted)", marginBottom: 20 }}>
-            Comece importando uma spec OpenAPI ou cadastrando sua primeira API.
+            Start by importing an OpenAPI spec or registering your first API.
           </p>
           <Button iconLeft={<Plus size={16} />} onClick={() => setCreating(true)}>
-            Nova fonte
+            New source
           </Button>
         </Card>
       )}
@@ -102,7 +103,7 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
                   iconLeft={<Pencil size={14} />}
                   onClick={() => setEditing(source)}
                 >
-                  Editar
+                  Edit
                 </Button>
                 <Button
                   variant="outline"
@@ -110,14 +111,14 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
                   iconLeft={<Trash2 size={14} />}
                   style={{ color: "var(--error-500)" }}
                   onClick={() => {
-                    if (confirm(`Excluir a fonte "${source.name}" e todos os seus endpoints?`)) {
+                    if (confirm(`Delete source "${source.name}" and all its endpoints?`)) {
                       startTransition(async () => {
                         await deleteSource(source.id);
                       });
                     }
                   }}
                 >
-                  Excluir
+                  Delete
                 </Button>
               </div>
             </div>
@@ -126,11 +127,11 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
               <Table>
                 <thead>
                   <tr>
-                    <Th style={{ width: 90 }}>Método</Th>
+                    <Th style={{ width: 90 }}>Method</Th>
                     <Th>Path</Th>
-                    <Th>Nome</Th>
+                    <Th>Name</Th>
                     <Th style={{ width: 90 }}>Params</Th>
-                    <Th style={{ width: 80 }}>Ativo</Th>
+                    <Th style={{ width: 80 }}>Active</Th>
                     <Th style={{ width: 50 }} />
                   </tr>
                 </thead>
@@ -172,9 +173,9 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
                         <Td>
                           <button
                             type="button"
-                            aria-label="Excluir endpoint"
+                            aria-label="Delete endpoint"
                             onClick={() => {
-                              if (confirm(`Excluir o endpoint ${ep.method} ${ep.path}?`)) {
+                              if (confirm(`Delete endpoint ${ep.method} ${ep.path}?`)) {
                                 startTransition(async () => {
                                   await deleteEndpoint(ep.id);
                                 });
@@ -199,7 +200,7 @@ export function FontesView({ sources }: { sources: SourceWithEndpoints[] }) {
               </Table>
             ) : (
               <p style={{ padding: "var(--space-5) var(--space-6)", color: "var(--text-muted)", font: "var(--type-body-sm)" }}>
-                Nenhum endpoint ainda. Adicione um endpoint manualmente.
+                No endpoints yet. Add one manually.
               </p>
             )}
           </Card>

@@ -5,7 +5,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 export const metadata: Metadata = {
   title: "ez-mcp",
   description:
-    "Transforme suas APIs em MCP servers prontos para Claude Code, Cursor e outros agentes.",
+    "Turn your APIs into MCP servers ready for Claude Code, Cursor, and other agents.",
 };
 
 export default function RootLayout({
@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="en">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
