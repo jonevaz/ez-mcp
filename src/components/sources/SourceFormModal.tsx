@@ -130,7 +130,7 @@ export function SourceFormModal({
       {!isEdit && (
         <Tabs
           items={[
-            { value: "import", label: "Import OpenAPI" },
+            { value: "import", label: "Import OpenAPI / Swagger" },
             { value: "manual", label: "Manual setup" },
           ]}
           value={tab}
@@ -143,16 +143,16 @@ export function SourceFormModal({
         {!isEdit && tab === "import" && (
           <>
             <Input
-              label="OpenAPI spec URL"
+              label="OpenAPI or Swagger spec URL"
               name="specUrl"
               placeholder="https://api.example.com/openapi.json"
-              hint="JSON or YAML. Alternatively, paste the content below."
+              hint="JSON or YAML. We auto-detect OpenAPI 3.x or Swagger 2.0, and if the URL points to a docs page instead of the raw spec, we try to locate it automatically."
             />
             <Textarea
               label="Or paste the spec"
               name="specText"
               rows={5}
-              placeholder='{"openapi": "3.0.0", ...}'
+              placeholder='{"openapi": "3.0.0", ...} or {"swagger": "2.0", ...}'
             />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <Input label="Name (optional)" name="name" placeholder="uses the spec title" />

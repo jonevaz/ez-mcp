@@ -11,14 +11,27 @@ export type ParsedEndpoint = {
   params: EndpointParam[];
 };
 
+export type SpecFormat = "openapi" | "swagger";
+
 export type ParsedSpec = {
   title: string;
   description: string;
   baseUrl: string;
+  format: SpecFormat;
   endpoints: ParsedEndpoint[];
 };
 
-/** Faz parse de uma spec OpenAPI/Swagger (JSON ou YAML) em endpoints simples. */
+/** Identifica se a spec é OpenAPI 3.x ou Swagger 2.0. */
+export function detectSpecFormat(spec: Record<string, unknown>): SpecFormat {
+  const openapiVersion = spec.openapi as string | undefined;
+  const swaggerVersion = spec.swagger as string | undefined;
+  if (typeof swaggerVersion === "string" && swaggerVersion.startsWith("2")) return "swagger";
+  if (typeof openapiVersion === "string") return "openapi";
+  // Sem campo de versão explícito: infere pela presença de host/basePath (Swagger 2.0).
+  return spec.host || spec.basePath ? "swagger" : "openapi";
+}
+
+/** Faz parse de uma spec OpenAPI 3.x ou Swagger 2.0 (JSON ou YAML) em endpoints simples. */
 export function parseOpenApiSpec(raw: string): ParsedSpec {
   let spec: Record<string, unknown>;
   try {
@@ -27,9 +40,10 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
     spec = YAML.parse(raw);
   }
   if (!spec || typeof spec !== "object" || !spec.paths) {
-    throw new Error("Invalid spec: could not find the OpenAPI `paths` object.");
+    throw new Error("Invalid spec: could not find the OpenAPI/Swagger `paths` object.");
   }
 
+  const format = detectSpecFormat(spec);
   const info = (spec.info ?? {}) as { title?: string; description?: string };
   const servers = (spec.servers ?? []) as Array<{ url?: string }>;
   // Swagger 2.0: host + basePath + schemes
@@ -46,16 +60,15 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
 
   for (const [pathKey, pathItem] of Object.entries(paths)) {
     if (!pathItem || typeof pathItem !== "object") continue;
-    const sharedParams = extractParams(
-      (pathItem.parameters as unknown[]) ?? []
-    );
+    const sharedRawParams = (pathItem.parameters as unknown[]) ?? [];
 
     for (const method of METHODS) {
       const op = pathItem[method] as Record<string, unknown> | undefined;
       if (!op || typeof op !== "object") continue;
 
-      const opParams = extractParams((op.parameters as unknown[]) ?? []);
-      const params = dedupeParams([...sharedParams, ...opParams]);
+      const opRawParams = (op.parameters as unknown[]) ?? [];
+      const rawParams = [...sharedRawParams, ...opRawParams];
+      const params = dedupeParams(extractParams(rawParams));
 
       // requestBody (OpenAPI 3) → parâmetro único "body"
       if (op.requestBody) {
@@ -70,6 +83,23 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
           required: rb.required ?? false,
           description: rb.description || "JSON request body.",
         });
+      } else {
+        // Swagger 2.0: parâmetro com in: "body" → mesmo parâmetro sintético "body"
+        const bodyParam = rawParams.find(
+          (p) => p && typeof p === "object" && (p as Record<string, unknown>).in === "body"
+        ) as Record<string, unknown> | undefined;
+        if (bodyParam) {
+          params.push({
+            name: "body",
+            in: "body",
+            type: "object",
+            required: Boolean(bodyParam.required),
+            description:
+              typeof bodyParam.description === "string"
+                ? bodyParam.description.trim()
+                : "JSON request body.",
+          });
+        }
       }
 
       const summary = (op.summary as string) || (op.description as string) || "";
@@ -91,6 +121,7 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
     title: info.title || "Imported API",
     description: (info.description || "").trim(),
     baseUrl,
+    format,
     endpoints,
   };
 }

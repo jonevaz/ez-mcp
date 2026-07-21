@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { eq, and, inArray } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { db, sources, endpoints, mcps, mcpTools } from "@/db";
-import { parseOpenApiSpec, toToolName } from "@/lib/openapi";
+import { parseOpenApiSpec, toToolName, type ParsedSpec } from "@/lib/openapi";
+import { discoverSpec } from "@/lib/spec-discovery";
 
 export type ActionResult = { ok: boolean; error?: string; id?: number };
 
@@ -128,22 +129,27 @@ export async function importOpenApi(formData: FormData): Promise<ActionResult> {
   const specText = String(formData.get("specText") || "").trim();
 
   let raw = specText;
+  let resolvedUrl = specUrl;
   try {
-    if (!raw && specUrl) {
-      const res = await fetch(specUrl, { signal: AbortSignal.timeout(20_000) });
-      if (!res.ok) {
-        return { ok: false, error: `Could not download the spec (HTTP ${res.status}).` };
-      }
-      raw = await res.text();
+    let parsed: ParsedSpec;
+    if (raw) {
+      parsed = parseOpenApiSpec(raw);
+    } else if (specUrl) {
+      // Detecta automaticamente OpenAPI 3.x vs Swagger 2.0 e, se a URL apontar
+      // para uma página de docs em vez da spec crua, tenta localizá-la.
+      const discovered = await discoverSpec(specUrl);
+      raw = discovered.raw;
+      resolvedUrl = discovered.url;
+      parsed = discovered.spec;
+    } else {
+      return { ok: false, error: "Provide the spec URL or paste the content." };
     }
-    if (!raw) return { ok: false, error: "Provide the spec URL or paste the content." };
 
-    const parsed = parseOpenApiSpec(raw);
     const name = String(formData.get("name") || "").trim() || parsed.title;
     let baseUrl = String(formData.get("baseUrl") || "").trim() || parsed.baseUrl;
     // Relative servers[] (e.g. "/api/v3") → resolve against the spec URL
-    if (baseUrl && !/^https?:\/\//i.test(baseUrl) && specUrl) {
-      baseUrl = new URL(baseUrl, specUrl).toString().replace(/\/$/, "");
+    if (baseUrl && !/^https?:\/\//i.test(baseUrl) && resolvedUrl) {
+      baseUrl = new URL(baseUrl, resolvedUrl).toString().replace(/\/$/, "");
     }
     if (!baseUrl) {
       return {
