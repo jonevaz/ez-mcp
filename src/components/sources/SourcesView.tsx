@@ -2,7 +2,8 @@
 
 import React from "react";
 import { Plus, Trash2, Pencil, Database } from "lucide-react";
-import type { Endpoint, Source } from "@/db/schema";
+import type { Endpoint } from "@/db/schema";
+import type { ClientSource } from "@/lib/source-dto";
 import { PageHeader } from "@/components/PageHeader";
 import { MethodBadge } from "@/components/MethodBadge";
 import { Button } from "@/components/ds/Button";
@@ -18,7 +19,7 @@ import {
 import { SourceFormModal } from "./SourceFormModal";
 import { EndpointFormModal } from "./EndpointFormModal";
 
-export type SourceWithEndpoints = Source & { endpoints: Endpoint[] };
+export type SourceWithEndpoints = ClientSource & { endpoints: Endpoint[] };
 
 const AUTH_LABELS: Record<string, string> = {
   none: "No auth",

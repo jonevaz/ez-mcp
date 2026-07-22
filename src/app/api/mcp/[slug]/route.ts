@@ -6,9 +6,10 @@ import {
   endpoints,
   sources,
   usageLogs,
-  type EndpointParam,
 } from "@/db";
 import { executeEndpoint } from "@/lib/executor";
+import { safeEqual } from "@/lib/secrets";
+import { paramsToInputSchema } from "@/lib/tool-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -41,22 +42,6 @@ function rpcError(id: number | string | null, code: number, message: string, sta
 
 function rpcResult(id: number | string | null | undefined, result: unknown) {
   return jsonResponse({ jsonrpc: "2.0", id: id ?? null, result });
-}
-
-function paramsToInputSchema(params: EndpointParam[]) {
-  const properties: Record<string, { type: string; description?: string }> = {};
-  const required: string[] = [];
-  for (const p of params) {
-    properties[p.name] = {
-      type: p.type,
-      description:
-        [p.description, p.in !== "body" ? `(${p.in})` : undefined]
-          .filter(Boolean)
-          .join(" ") || undefined,
-    };
-    if (p.required) required.push(p.name);
-  }
-  return { type: "object" as const, properties, required };
 }
 
 function loadMcpBySlug(slug: string) {
@@ -93,7 +78,7 @@ export async function POST(
   }
 
   const authHeader = req.headers.get("authorization") || "";
-  if (!mcp.token || authHeader !== `Bearer ${mcp.token}`) {
+  if (!mcp.token || !safeEqual(authHeader, `Bearer ${mcp.token}`)) {
     return jsonResponse({ error: "Invalid or missing Bearer token." }, 401);
   }
 
@@ -159,6 +144,35 @@ export async function POST(
       const started = Date.now();
       try {
         const result = await executeEndpoint(row.source, row.endpoint, args);
+
+        // Argumentos inválidos: nada foi chamado. O erro volta como resultado
+        // (não como erro JSON-RPC) para que o agente possa se corrigir e tentar
+        // de novo, que é o comportamento previsto pelo protocolo.
+        if (result.kind === "invalid_args") {
+          db.insert(usageLogs)
+            .values({
+              mcpId: mcp.id,
+              toolName,
+              status: "error",
+              httpStatus: null,
+              durationMs: Date.now() - started,
+              createdAt: Date.now(),
+            })
+            .run();
+
+          return rpcResult(id, {
+            content: [
+              {
+                type: "text",
+                text:
+                  `Invalid arguments for \`${toolName}\` — the request was not sent.\n` +
+                  result.errors.map((e) => `- ${e}`).join("\n"),
+              },
+            ],
+            isError: true,
+          });
+        }
+
         db.insert(usageLogs)
           .values({
             mcpId: mcp.id,

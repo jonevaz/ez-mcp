@@ -6,8 +6,15 @@ import { customAlphabet } from "nanoid";
 import { db, sources, endpoints, mcps, mcpTools } from "@/db";
 import { parseOpenApiSpec, toToolName, type ParsedSpec } from "@/lib/openapi";
 import { discoverSpec } from "@/lib/spec-discovery";
+import { encryptAuthConfig, mergeSecrets } from "@/lib/secrets";
 
-export type ActionResult = { ok: boolean; error?: string; id?: number };
+export type ActionResult = {
+  ok: boolean;
+  error?: string;
+  id?: number;
+  /** Avisos não fatais da importação (refs não resolvidas, media types etc.). */
+  warnings?: string[];
+};
 
 const tokenGen = customAlphabet(
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
@@ -27,31 +34,48 @@ function slugify(name: string): string {
   );
 }
 
-function authConfigFrom(formData: FormData): string | null {
+/**
+ * Monta o `auth_config` criptografado a partir do formulário.
+ *
+ * `existingRaw` é o valor já gravado: campos secretos devolvidos como
+ * placeholder (o browser nunca recebe o segredo real) mantêm o valor anterior.
+ */
+function authConfigFrom(formData: FormData, existingRaw: string | null = null): string | null {
   const authType = String(formData.get("authType") || "none");
+  const field = (name: string) => String(formData.get(name) || "");
+
+  let config: Record<string, unknown> | null;
   switch (authType) {
     case "bearer":
-      return JSON.stringify({ token: String(formData.get("authToken") || "") });
+      config = { token: field("authToken") };
+      break;
     case "api_key":
-      return JSON.stringify({
-        header: String(formData.get("authHeader") || "X-API-Key"),
-        value: String(formData.get("authValue") || ""),
-      });
+      config = {
+        header: field("authHeader") || "X-API-Key",
+        value: field("authValue"),
+      };
+      break;
     case "basic":
-      return JSON.stringify({
-        username: String(formData.get("authUsername") || ""),
-        password: String(formData.get("authPassword") || ""),
-      });
+      config = { username: field("authUsername"), password: field("authPassword") };
+      break;
     case "oauth2":
-      return JSON.stringify({
-        tokenUrl: String(formData.get("authTokenUrl") || ""),
-        clientId: String(formData.get("authClientId") || ""),
-        clientSecret: String(formData.get("authClientSecret") || ""),
-        scope: String(formData.get("authScope") || "") || undefined,
-      });
+      config = {
+        tokenUrl: field("authTokenUrl"),
+        clientId: field("authClientId"),
+        clientSecret: field("authClientSecret"),
+        scope: field("authScope") || undefined,
+      };
+      break;
     default:
-      return null;
+      config = null;
   }
+
+  if (config === null) return null;
+  return encryptAuthConfig(JSON.stringify(mergeSecrets(config, existingRaw)));
+}
+
+function loadSource(id: number) {
+  return db.select().from(sources).where(eq(sources.id, id)).all()[0];
 }
 
 // ---------------- Sources ----------------
@@ -83,13 +107,16 @@ export async function updateSource(id: number, formData: FormData): Promise<Acti
   const baseUrl = String(formData.get("baseUrl") || "").trim();
   if (!name || !baseUrl) return { ok: false, error: "Name and base URL are required." };
 
+  const existing = loadSource(id);
+  if (!existing) return { ok: false, error: "Source not found." };
+
   db.update(sources)
     .set({
       name,
       description: String(formData.get("description") || "").trim() || null,
       baseUrl,
       authType: String(formData.get("authType") || "none"),
-      authConfig: authConfigFrom(formData),
+      authConfig: authConfigFrom(formData, existing.authConfig),
     })
     .where(eq(sources.id, id))
     .run();
@@ -187,7 +214,7 @@ export async function importOpenApi(formData: FormData): Promise<ActionResult> {
     }
 
     revalidatePath("/sources");
-    return { ok: true, id: row.id };
+    return { ok: true, id: row.id, warnings: parsed.warnings };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to import the spec." };
   }
@@ -217,10 +244,38 @@ export async function createEndpoint(sourceId: number, formData: FormData): Prom
 }
 
 export async function deleteEndpoint(id: number): Promise<ActionResult> {
+  // MCPs que expõem este endpoint perdem a tool via cascade. Um MCP publicado
+  // que fique sem nenhuma tool volta a rascunho, em vez de servir uma lista vazia.
+  const affectedMcpIds = db
+    .selectDistinct({ mcpId: mcpTools.mcpId })
+    .from(mcpTools)
+    .where(eq(mcpTools.endpointId, id))
+    .all()
+    .map((r) => r.mcpId);
+
   db.delete(endpoints).where(eq(endpoints.id, id)).run();
+  unpublishEmptyMcps(affectedMcpIds);
+
   revalidatePath("/sources");
   revalidatePath("/mcps");
   return { ok: true };
+}
+
+/** Volta a rascunho os MCPs publicados que ficaram sem nenhuma tool habilitada. */
+function unpublishEmptyMcps(mcpIds: number[]) {
+  for (const mcpId of mcpIds) {
+    const remaining = db
+      .select({ id: mcpTools.id })
+      .from(mcpTools)
+      .where(and(eq(mcpTools.mcpId, mcpId), eq(mcpTools.enabled, true)))
+      .all().length;
+    if (remaining > 0) continue;
+    db.update(mcps)
+      .set({ published: false })
+      .where(and(eq(mcps.id, mcpId), eq(mcps.published, true)))
+      .run();
+    revalidatePath(`/mcps/${mcpId}`);
+  }
 }
 
 export async function toggleEndpoint(id: number, enabled: boolean): Promise<ActionResult> {

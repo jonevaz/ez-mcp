@@ -1,0 +1,119 @@
+# Spec sintética que concentra os casos que quebravam o parser:
+# parâmetros por $ref, schema recursivo, allOf, ref externa e enums.
+openapi: 3.0.3
+info:
+  title: Edge Cases API
+  description: Fixture for parser edge cases.
+servers:
+  - url: https://api.edge.example/v1
+paths:
+  /nodes/{nodeId}:
+    # Parâmetro declarado no path item, herdado por todas as operações.
+    parameters:
+      - $ref: "#/components/parameters/NodeId"
+    get:
+      operationId: getNode
+      summary: Fetch a node and its children.
+      parameters:
+        - name: depth
+          in: query
+          schema:
+            type: integer
+            default: 1
+            maximum: 5
+      responses:
+        "200":
+          description: ok
+    put:
+      operationId: replaceNode
+      summary: Replace a node.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Node"
+      responses:
+        "200":
+          description: ok
+
+  /reports:
+    post:
+      operationId: createReport
+      summary: Create a report.
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [pdf, csv, json]
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportRequest"
+      responses:
+        "201":
+          description: created
+
+  /legacy:
+    get:
+      operationId: legacyOp
+      summary: Operation pointing at a spec we cannot fetch.
+      parameters:
+        - $ref: "https://other.example/common.yaml#/components/parameters/Locale"
+      responses:
+        "200":
+          description: ok
+
+components:
+  parameters:
+    NodeId:
+      name: nodeId
+      in: path
+      required: true
+      description: Identifier of the node.
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    # Recursivo: children é um array de Node.
+    Node:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/Node"
+
+    Timestamps:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+
+    ReportRequest:
+      allOf:
+        - $ref: "#/components/schemas/Timestamps"
+        - type: object
+          required: [title]
+          properties:
+            title:
+              type: string
+            severity:
+              type: string
+              enum: [low, high]

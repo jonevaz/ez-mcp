@@ -1,7 +1,15 @@
 import YAML from "yaml";
 import type { EndpointParam } from "@/db/schema";
+import { SchemaResolver, schemaType, type JsonSchema } from "@/lib/json-schema";
 
 const METHODS = ["get", "post", "put", "patch", "delete"] as const;
+
+/** Media types de corpo que sabemos serializar, em ordem de preferência. */
+const BODY_CONTENT_PREFERENCE = [
+  "application/json",
+  "application/x-www-form-urlencoded",
+  "text/plain",
+];
 
 export type ParsedEndpoint = {
   name: string;
@@ -19,6 +27,8 @@ export type ParsedSpec = {
   baseUrl: string;
   format: SpecFormat;
   endpoints: ParsedEndpoint[];
+  /** Problemas não fatais encontrados na importação (refs externas, media types etc.). */
+  warnings: string[];
 };
 
 /** Identifica se a spec é OpenAPI 3.x ou Swagger 2.0. */
@@ -44,6 +54,9 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
   }
 
   const format = detectSpecFormat(spec);
+  const resolver = new SchemaResolver(spec);
+  const warnings: string[] = [];
+
   const info = (spec.info ?? {}) as { title?: string; description?: string };
   const servers = (spec.servers ?? []) as Array<{ url?: string }>;
   // Swagger 2.0: host + basePath + schemes
@@ -55,52 +68,28 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
     servers[0]?.url ??
     (swaggerHost ? `${swaggerScheme}://${swaggerHost}${swaggerBase}` : "");
 
+  const globalConsumes = (spec.consumes as string[] | undefined) ?? [];
   const endpoints: ParsedEndpoint[] = [];
   const paths = spec.paths as Record<string, Record<string, unknown>>;
 
-  for (const [pathKey, pathItem] of Object.entries(paths)) {
-    if (!pathItem || typeof pathItem !== "object") continue;
+  for (const [pathKey, rawPathItem] of Object.entries(paths)) {
+    const pathItem = resolver.derefRaw(rawPathItem);
+    if (!pathItem) continue;
     const sharedRawParams = (pathItem.parameters as unknown[]) ?? [];
 
     for (const method of METHODS) {
-      const op = pathItem[method] as Record<string, unknown> | undefined;
-      if (!op || typeof op !== "object") continue;
+      const op = resolver.derefRaw(pathItem[method]);
+      if (!op) continue;
 
       const opRawParams = (op.parameters as unknown[]) ?? [];
       const rawParams = [...sharedRawParams, ...opRawParams];
-      const params = dedupeParams(extractParams(rawParams));
+      const params = dedupeParams(extractParams(rawParams, resolver, warnings));
 
-      // requestBody (OpenAPI 3) → parâmetro único "body"
-      if (op.requestBody) {
-        const rb = op.requestBody as {
-          required?: boolean;
-          description?: string;
-        };
-        params.push({
-          name: "body",
-          in: "body",
-          type: "object",
-          required: rb.required ?? false,
-          description: rb.description || "JSON request body.",
-        });
-      } else {
-        // Swagger 2.0: parâmetro com in: "body" → mesmo parâmetro sintético "body"
-        const bodyParam = rawParams.find(
-          (p) => p && typeof p === "object" && (p as Record<string, unknown>).in === "body"
-        ) as Record<string, unknown> | undefined;
-        if (bodyParam) {
-          params.push({
-            name: "body",
-            in: "body",
-            type: "object",
-            required: Boolean(bodyParam.required),
-            description:
-              typeof bodyParam.description === "string"
-                ? bodyParam.description.trim()
-                : "JSON request body.",
-          });
-        }
-      }
+      const bodyParam = extractBodyParam(op, rawParams, resolver, globalConsumes, warnings, {
+        method,
+        path: pathKey,
+      });
+      if (bodyParam) params.push(bodyParam);
 
       const summary = (op.summary as string) || (op.description as string) || "";
       endpoints.push({
@@ -117,31 +106,124 @@ export function parseOpenApiSpec(raw: string): ParsedSpec {
     throw new Error("The spec doesn't contain recognizable operations in `paths`.");
   }
 
+  for (const ref of resolver.unresolved) {
+    warnings.push(`Could not resolve reference \`${ref}\` — affected fields were left untyped.`);
+  }
+
   return {
     title: info.title || "Imported API",
     description: (info.description || "").trim(),
     baseUrl,
     format,
     endpoints,
+    warnings,
   };
 }
 
-function extractParams(list: unknown[]): EndpointParam[] {
+/**
+ * Extrai o parâmetro sintético `body` de uma operação.
+ * OpenAPI 3.x usa `requestBody.content[mediaType].schema`; Swagger 2.0 usa um
+ * parâmetro com `in: "body"`.
+ */
+function extractBodyParam(
+  op: Record<string, unknown>,
+  rawParams: unknown[],
+  resolver: SchemaResolver,
+  globalConsumes: string[],
+  warnings: string[],
+  ctx: { method: string; path: string }
+): EndpointParam | null {
+  // OpenAPI 3.x
+  const requestBody = resolver.derefRaw(op.requestBody);
+  if (requestBody) {
+    const content = (requestBody.content ?? {}) as Record<string, { schema?: unknown }>;
+    const mediaTypes = Object.keys(content);
+    const chosen =
+      BODY_CONTENT_PREFERENCE.find((c) => mediaTypes.includes(c)) ??
+      mediaTypes.find((c) => c.endsWith("+json")) ??
+      mediaTypes[0];
+    if (!chosen) return null;
+    if (!BODY_CONTENT_PREFERENCE.includes(chosen) && !chosen.endsWith("+json")) {
+      warnings.push(
+        `${ctx.method.toUpperCase()} ${ctx.path}: request body uses \`${chosen}\`, which is sent as a raw string.`
+      );
+    }
+    const schema = resolver.deref(content[chosen]?.schema);
+    return {
+      name: "body",
+      in: "body",
+      type: schemaType(schema) === "array" ? "array" : "object",
+      required: Boolean(requestBody.required),
+      description: describeBody(requestBody.description, schema),
+      schema: Object.keys(schema).length > 0 ? schema : undefined,
+      contentType: chosen,
+    };
+  }
+
+  // Swagger 2.0: parâmetro com in: "body"
+  const swaggerBody = rawParams
+    .map((p) => resolver.derefRaw(p))
+    .find((p) => p?.in === "body");
+  if (swaggerBody) {
+    const schema = resolver.deref(swaggerBody.schema);
+    const consumes = ((op.consumes as string[] | undefined) ?? globalConsumes)[0];
+    return {
+      name: "body",
+      in: "body",
+      type: schemaType(schema) === "array" ? "array" : "object",
+      required: Boolean(swaggerBody.required),
+      description: describeBody(swaggerBody.description, schema),
+      schema: Object.keys(schema).length > 0 ? schema : undefined,
+      contentType: consumes || "application/json",
+    };
+  }
+
+  return null;
+}
+
+function describeBody(description: unknown, schema: JsonSchema): string {
+  if (typeof description === "string" && description.trim()) return description.trim();
+  if (typeof schema.description === "string" && schema.description.trim()) {
+    return schema.description.trim();
+  }
+  return "Request body.";
+}
+
+/**
+ * Converte a lista `parameters` da spec em parâmetros de endpoint.
+ * Resolve `$ref` (do parâmetro e do schema dele) e preserva o schema completo —
+ * é o que permite ao agente ver `enum`, `format`, `items` e `default`.
+ */
+function extractParams(
+  list: unknown[],
+  resolver: SchemaResolver,
+  warnings: string[]
+): EndpointParam[] {
   const out: EndpointParam[] = [];
   for (const item of list) {
-    if (!item || typeof item !== "object") continue;
-    const p = item as Record<string, unknown>;
-    if (p.$ref) continue; // $refs não são resolvidos nesta versão
+    const p = resolver.derefRaw(item);
+    if (!p) continue;
     const where = p.in as string;
-    if (!["path", "query", "header"].includes(where)) continue;
-    const schema = (p.schema ?? {}) as { type?: string };
-    const type = normalizeType(schema.type ?? (p.type as string));
+    if (!["path", "query", "header", "formData"].includes(where)) continue;
+
+    if (where === "formData" && p.type === "file") {
+      warnings.push(`Parameter \`${String(p.name)}\`: file uploads are not supported.`);
+      continue;
+    }
+
+    // OpenAPI 3.x carrega o schema em `schema`; Swagger 2.0 o declara inline.
+    const schema = resolver.deref(p.schema ?? p);
+    // `title` inline do parâmetro não é do schema; `required` é do parâmetro.
+    delete schema.required;
+
     out.push({
       name: String(p.name ?? ""),
       in: where as EndpointParam["in"],
-      type,
-      required: Boolean(p.required),
+      type: normalizeType(schemaType(schema)),
+      // Pela spec, parâmetros de path são sempre obrigatórios.
+      required: Boolean(p.required) || where === "path",
       description: typeof p.description === "string" ? p.description.trim() : undefined,
+      schema: Object.keys(schema).length > 0 ? schema : undefined,
     });
   }
   return out.filter((p) => p.name);
@@ -162,12 +244,16 @@ function normalizeType(t?: string): EndpointParam["type"] {
 
 function dedupeParams(params: EndpointParam[]): EndpointParam[] {
   const seen = new Set<string>();
-  return params.filter((p) => {
+  // Percorre de trás para frente: parâmetros da operação vencem os do path item.
+  const kept: EndpointParam[] = [];
+  for (let i = params.length - 1; i >= 0; i--) {
+    const p = params[i];
     const key = `${p.in}:${p.name}`;
-    if (seen.has(key)) return false;
+    if (seen.has(key)) continue;
     seen.add(key);
-    return true;
-  });
+    kept.unshift(p);
+  }
+  return kept;
 }
 
 /** Gera um nome de tool MCP válido (snake_case) a partir do endpoint. */

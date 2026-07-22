@@ -2,7 +2,8 @@
 
 import React from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { EndpointParam, Source } from "@/db/schema";
+import type { EndpointParam } from "@/db/schema";
+import type { ClientSource } from "@/lib/source-dto";
 import { Modal } from "@/components/ds/Modal";
 import { Input } from "@/components/ds/Input";
 import { Select } from "@/components/ds/Select";
@@ -25,7 +26,7 @@ export function EndpointFormModal({
 }: {
   open: boolean;
   onClose: () => void;
-  source: Source | null;
+  source: ClientSource | null;
 }) {
   const [params, setParams] = React.useState<EndpointParam[]>([]);
   const [error, setError] = React.useState<string | null>(null);

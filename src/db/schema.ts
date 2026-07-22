@@ -67,8 +67,16 @@ export type UsageLog = typeof usageLogs.$inferSelect;
 // Parâmetro de endpoint (armazenado como JSON em endpoints.params_schema)
 export type EndpointParam = {
   name: string;
-  in: "path" | "query" | "header" | "body";
+  in: "path" | "query" | "header" | "body" | "formData";
   type: "string" | "number" | "integer" | "boolean" | "object" | "array";
   required: boolean;
   description?: string;
+  /**
+   * JSON Schema completo do parâmetro, com `$ref` já resolvido — é o que vai
+   * para o `inputSchema` da tool. Ausente em endpoints criados manualmente e
+   * em registros gravados antes da resolução de `$ref` (fallback: `type`).
+   */
+  schema?: Record<string, unknown>;
+  /** Só para `in: "body"`: media type usado ao serializar (default application/json). */
+  contentType?: string;
 };

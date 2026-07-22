@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import type { Source } from "@/db/schema";
+import type { ClientSource } from "@/lib/source-dto";
 import { Modal } from "@/components/ds/Modal";
 import { Tabs } from "@/components/ds/Tabs";
 import { Input } from "@/components/ds/Input";
@@ -9,6 +9,12 @@ import { Textarea } from "@/components/ds/Textarea";
 import { Select } from "@/components/ds/Select";
 import { Button } from "@/components/ds/Button";
 import { createSource, importOpenApi, updateSource } from "@/lib/actions";
+
+/**
+ * Dica mostrada nos campos secretos. Segredos já gravados chegam aqui como
+ * placeholder (`••••••••`) e são preservados se o campo não for editado.
+ */
+const SECRET_HINT = "Leave unchanged to keep the stored value. Use `env:VAR_NAME` to read it from the environment instead.";
 
 /** Campos de autenticação compartilhados entre os modos manual e import. */
 function AuthFields({
@@ -18,9 +24,10 @@ function AuthFields({
 }: {
   authType: string;
   setAuthType: (v: string) => void;
-  source?: Source | null;
+  source?: ClientSource | null;
 }) {
-  const config = source?.authConfig ? JSON.parse(source.authConfig) : {};
+  // Segredos nunca chegam ao browser em texto puro — ver lib/secrets.
+  const config = (source?.authConfigMasked ?? {}) as Record<string, string>;
   return (
     <>
       <Select
@@ -41,12 +48,18 @@ function AuthFields({
           name="authToken"
           defaultValue={config.token || ""}
           placeholder="access token for the source API"
+          hint={SECRET_HINT}
         />
       )}
       {authType === "api_key" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Input label="Header" name="authHeader" defaultValue={config.header || "X-API-Key"} />
-          <Input label="Value" name="authValue" defaultValue={config.value || ""} />
+          <Input
+            label="Value"
+            name="authValue"
+            defaultValue={config.value || ""}
+            hint={SECRET_HINT}
+          />
         </div>
       )}
       {authType === "basic" && (
@@ -55,8 +68,8 @@ function AuthFields({
           <Input
             label="Password"
             name="authPassword"
-            type="password"
             defaultValue={config.password || ""}
+            hint={SECRET_HINT}
           />
         </div>
       )}
@@ -74,8 +87,8 @@ function AuthFields({
             <Input
               label="Client Secret"
               name="authClientSecret"
-              type="password"
               defaultValue={config.clientSecret || ""}
+              hint={SECRET_HINT}
             />
           </div>
           <Input
@@ -97,12 +110,13 @@ export function SourceFormModal({
 }: {
   open: boolean;
   onClose: () => void;
-  source?: Source | null;
+  source?: ClientSource | null;
 }) {
   const isEdit = Boolean(source);
   const [tab, setTab] = React.useState<string>(isEdit ? "manual" : "import");
   const [authType, setAuthType] = React.useState(source?.authType || "none");
   const [error, setError] = React.useState<string | null>(null);
+  const [warnings, setWarnings] = React.useState<string[]>([]);
   const [pending, setPending] = React.useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -116,8 +130,48 @@ export function SourceFormModal({
       ? await importOpenApi(formData)
       : await createSource(formData);
     setPending(false);
-    if (result.ok) onClose();
-    else setError(result.error || "Something went wrong.");
+
+    if (!result.ok) {
+      setError(result.error || "Something went wrong.");
+      return;
+    }
+    // A fonte já foi criada. Se partes da spec não puderam ser interpretadas,
+    // mostramos o que ficou de fora em vez de fechar como se estivesse perfeito.
+    if (result.warnings?.length) {
+      setWarnings(result.warnings);
+      return;
+    }
+    onClose();
+  }
+
+  if (warnings.length > 0) {
+    return (
+      <Modal open={open} onClose={onClose} title="Imported with warnings" width={620}>
+        <p style={{ font: "var(--type-body-sm)", marginBottom: "var(--space-4)" }}>
+          The source was created, but parts of the spec could not be fully interpreted.
+          Tools for the affected operations may be missing parameters — review them before
+          publishing.
+        </p>
+        <ul
+          style={{
+            font: "var(--type-body-sm)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            paddingLeft: "1.2em",
+            maxHeight: 280,
+            overflowY: "auto",
+          }}
+        >
+          {warnings.map((w, i) => (
+            <li key={i}>{w}</li>
+          ))}
+        </ul>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-6)" }}>
+          <Button onClick={onClose}>Got it</Button>
+        </div>
+      </Modal>
+    );
   }
 
   return (
